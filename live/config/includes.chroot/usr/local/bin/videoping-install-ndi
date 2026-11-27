@@ -1,0 +1,101 @@
+#!/bin/bash
+# Install the NDI 6 runtime (libndi.so.6) for videoping on the live system, following
+# videoping's install.md ("2. NDI runtime"). NDI is proprietary and not part of the image:
+# this script gets the free "NDI SDK for Linux", runs Vizrt's installer (you read and accept
+# the NDI license there) and copies libndi.so* to ~/.local/lib, where videoping looks for it.
+#
+#   videoping-install-ndi                 SDK from a USB stick if there is one, else download it
+#   videoping-install-ndi FILE            use this Install_NDI_SDK_v6_Linux.tar.gz (or .sh)
+#   videoping-install-ndi --pause [FILE]  wait for Enter at the end (used by the desktop menu)
+#
+# The live system starts fresh on every boot: run it again after a reboot, or keep it with
+# live-boot persistence (/home union), or put the SDK on your clip stick so it works offline.
+set -euo pipefail
+
+URL="https://downloads.ndi.tv/SDK/NDI_SDK_Linux/Install_NDI_SDK_v6_Linux.tar.gz"
+DEST="$HOME/.local/lib"
+ARCH_DIR="x86_64-linux-gnu"
+
+pause=0
+if [ "${1:-}" = "--pause" ]; then pause=1; shift; fi
+finish() {
+  rc=$?
+  [ -n "${WORK:-}" ] && rm -rf "$WORK"
+  if [ "$pause" = 1 ]; then
+    echo
+    read -rp "Press Enter to close. " _ || true
+  fi
+  exit "$rc"
+}
+trap finish EXIT
+log() { logger -t videoping-live -- "ndi: $*"; }
+die() { echo "error: $*" >&2; log "install failed: $*"; exit 1; }
+
+echo "== NDI runtime for videoping"
+echo
+
+if [ -e "$DEST/libndi.so.6" ]; then
+  echo "Already installed: $(readlink -f "$DEST/libndi.so.6")"
+  read -rp "Install again? [y/N] " ans
+  [ "$ans" = y ] || [ "$ans" = Y ] || exit 0
+fi
+
+# 1. find the SDK: argument, USB sticks / disks, else download
+src="${1:-}"
+if [ -z "$src" ]; then
+  src=$(find /media -maxdepth 4 \( -name 'Install_NDI_SDK_v6_Linux.tar.gz' -o -name 'Install_NDI_SDK_v6_Linux.sh' \) \
+          2>/dev/null | head -n 1 || true)
+  [ -n "$src" ] && echo "Found the SDK on a drive: $src"
+fi
+
+WORK=$(mktemp -d)
+cd "$WORK"
+
+if [ -z "$src" ]; then
+  echo "Downloading the NDI SDK for Linux (about 70 MB)"
+  echo "  $URL"
+  curl -fL --progress-bar -o Install_NDI_SDK_v6_Linux.tar.gz "$URL" \
+    || die "download failed. Connect to a network (menu: Network) or put Install_NDI_SDK_v6_Linux.tar.gz on a USB stick"
+  src="$WORK/Install_NDI_SDK_v6_Linux.tar.gz"
+fi
+[ -f "$src" ] || die "no such file: $src"
+
+# 2. unpack and run Vizrt's installer: it shows the license and asks to accept with y
+case "$src" in
+  *.tar.gz|*.tgz) tar -xzf "$src" ;;
+  *.sh) cp "$src" . ;;
+  *) die "expected Install_NDI_SDK_v6_Linux.tar.gz or .sh, got: $src" ;;
+esac
+installer=$(find . -maxdepth 1 -name 'Install_NDI_SDK_v*_Linux.sh' | head -n 1)
+[ -n "$installer" ] || die "no Install_NDI_SDK_v*_Linux.sh in $src"
+
+echo
+echo "The NDI license follows (space: next page, q: end). Accept it with y."
+read -rp "Press Enter to show it. " _
+PAGER="${PAGER:-less}" sh "$installer" > /dev/null || die "the NDI license was not accepted"
+
+libdir="$WORK/NDI SDK for Linux/lib/$ARCH_DIR"
+[ -e "$libdir/libndi.so.6" ] || die "libndi.so.6 not found in the SDK ($libdir)"
+
+# 3. copy the library where videoping finds it (just for this user, nothing else is affected)
+mkdir -p "$DEST"
+cp -P "$libdir"/libndi.so* "$DEST/"
+echo
+echo "Installed:"
+ls -l "$DEST"/libndi.so*
+
+# No "30 minutes" check as in install.md: the regular SDK 6.4 libndi contains that text too.
+# Only the regular installer (Install_NDI_SDK_v*_Linux.sh, not the Advanced SDK) is accepted above.
+
+# 4. discovery needs avahi (mDNS); the live image has no firewall
+if systemctl is-active --quiet avahi-daemon; then
+  echo "avahi-daemon (NDI discovery) is running."
+else
+  echo "warning: avahi-daemon is not running, NDI sources may not be found: sudo systemctl start avahi-daemon"
+fi
+
+log "installed $(readlink -f "$DEST/libndi.so.6")"
+echo
+echo "Done. In videoping open the output options and turn on NDI output (\"NDI sending\" in green)."
+echo "NDI sources on the network show up in the finder under NDI sources."
+echo "If videoping was already running and shows an NDI error, restart it: Ctrl+Alt+R."

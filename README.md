@@ -29,8 +29,8 @@ boot, play. Nothing is installed on the machine's disk.
 - screens: every connected screen is switched on, side by side from left to right. The first
   one shows the videoping ui, and the output goes to whichever screen you choose in videoping
 
-Not included: the NDI runtime (`libndi.so.6`, proprietary license, see videoping's
-`install.md`) and the proprietary NVIDIA driver.
+Not included: the NDI runtime (`libndi.so.6`, proprietary license) and the proprietary NVIDIA
+driver. The NDI runtime can be installed on the running live system, see below.
 
 ## using the live system
 
@@ -48,6 +48,11 @@ Then boot from the stick.
 | **Ctrl+Alt+T** | terminal |
 | **Ctrl+Alt+F2** … **F6** | text consoles; **Ctrl+Alt+F1** goes back |
 
+- **NDI**: menu → *Install NDI runtime* (or `videoping-install-ndi` in a terminal). It takes
+  `Install_NDI_SDK_v6_Linux.tar.gz` from a USB stick if one has it (works offline), otherwise
+  downloads it from ndi.tv, runs Vizrt's installer (read and accept the NDI license with `y`)
+  and copies `libndi.so*` to `~/.local/lib`, following videoping's `install.md`. Like everything
+  else it is gone after a reboot, unless you use persistence
 - user `vj`, password `live`, `sudo` without a password
 - logs: `journalctl -b -t videoping-live -t videoping`. `videoping-live` lists the GPU, audio
   cards, audio inputs and outputs and the MIDI devices found at startup

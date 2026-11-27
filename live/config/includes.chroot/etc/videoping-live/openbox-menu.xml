@@ -10,6 +10,7 @@
     <item label="Focusrite Scarlett mixer"><action name="Execute"><command>alsa-scarlett-gui</command></action></item>
     <separator/>
     <item label="Network"><action name="Execute"><command>xterm -title Network -e nmtui</command></action></item>
+    <item label="Install NDI runtime"><action name="Execute"><command>xterm -title "Install NDI runtime" -e videoping-install-ndi --pause</command></action></item>
     <item label="Terminal   (Ctrl+Alt+T)"><action name="Execute"><command>xterm</command></action></item>
     <item label="System log"><action name="Execute"><command>xterm -title "System log" -e journalctl -b -f -t videoping-live -t videoping</command></action></item>
     <separator/>
