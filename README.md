@@ -79,7 +79,7 @@ This starts a Debian 13 build VM (`bento/debian-13`) and runs, as Vagrant provis
 | `rust` | Rust via rustup | |
 | `deb` | builds the videoping `.deb` on Debian 13 (`scripts/build-videoping-deb.sh`) | `debs/videoping_*.deb` |
 | `iso` | builds the live ISO (`scripts/build-iso.sh`) | `out/videoping-live-<date>-amd64.iso` |
-| `smoke` | boots the ISO headless in QEMU and checks on the serial console that videoping runs (`scripts/smoke-test.sh`) | `out/smoke-test/serial.log`, `screen.png` |
+| `smoke` | boots the ISO headless in QEMU, checks on the serial console that videoping runs and that the screen is not one flat colour (`scripts/smoke-test.sh`) | `out/smoke-test/serial.log`, `screen.png` |
 
 The build VM has nested virtualization turned off: with VirtualBox 7.2, KVM inside the VM
 corrupted the test system's memory and then crashed the build VM. The smoke test therefore uses

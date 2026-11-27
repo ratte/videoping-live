@@ -1,7 +1,7 @@
 #!/bin/bash
 # Smoke test: boot the ISO headless in QEMU (KVM if available, else software emulation) and check
 # on the serial console that the live system comes up, starts the X session and keeps videoping
-# running. Takes a screenshot (out/smoke-test/screen.png).
+# running, and that something is drawn on the screen (out/smoke-test/screen.png).
 #
 #   scripts/smoke-test.sh [iso]     (default: out/videoping-live-latest.iso)
 #
@@ -45,16 +45,39 @@ for ((t = 0; t < TIMEOUT; t += 5)); do
   kill -0 "$QPID" 2>/dev/null || { echo "smoke-test: QEMU stopped"; break; }
   if grep -q "videoping running" "$WORK/serial.log"; then ok=1; break; fi
 done
-# give videoping-live-info time to log and videoping time to draw (slow without KVM), then
-# take a screenshot
-[ $ok = 1 ] && { [ "$USE_KVM" = 1 ] && sleep 20 || sleep 120; }
-echo "screendump $TMP/screen.ppm" | socat - "UNIX-CONNECT:$TMP/monitor.sock" >/dev/null 2>&1
-sleep 2
-[ -f "$TMP/screen.ppm" ] && pnmtopng "$TMP/screen.ppm" > "$WORK/screen.png" 2>/dev/null
+# videoping logs "gpu: ..." once its GL context is up (minutes after the start without KVM);
+# then give it time to draw and take screenshots until the screen is no longer one flat colour
+shot() {
+  rm -f "$TMP/screen.ppm"
+  echo "screendump $TMP/screen.ppm" | socat - "UNIX-CONNECT:$TMP/monitor.sock" >/dev/null 2>&1
+  sleep 2
+  [ -f "$TMP/screen.ppm" ] && pnmtopng "$TMP/screen.ppm" > "$WORK/screen.png" 2>/dev/null
+}
+drawn=0
+if [ $ok = 1 ]; then
+  if [ "$USE_KVM" = 1 ]; then SETTLE=10; SHOTS=6; else SETTLE=60; SHOTS=10; fi
+  for ((; t < TIMEOUT; t += 5)); do
+    grep -a -q -E "videoping\[[0-9]+\]: gpu:" "$WORK/serial.log" && break
+    sleep 5
+  done
+  sleep "$SETTLE"
+  for ((i = 0; i < SHOTS; i++)); do
+    shot
+    if [ -f "$TMP/screen.ppm" ] && [ "$(ppmhist -noheader "$TMP/screen.ppm" 2>/dev/null | wc -l)" -gt 1 ]; then
+      drawn=1; break
+    fi
+    sleep 15
+  done
+else
+  shot
+fi
 
 echo "--- from the serial console:"
 grep -a -E "videoping(-live)?\[[0-9]+\]:" "$WORK/serial.log" | sed 's/\x1b\[[0-9;]*m//g; s/^.*\]: //' | grep -v '^$' | head -40
-if [ $ok = 1 ]; then
+if [ $ok = 1 ] && [ $drawn = 0 ]; then
+  echo "smoke-test: FAILED (videoping is running, but the screen stays one flat colour; screenshot: $WORK/screen.png)"
+  exit 1
+elif [ $ok = 1 ]; then
   echo "smoke-test: OK (videoping is running; log: $WORK/serial.log, screenshot: $WORK/screen.png)"
 else
   echo "smoke-test: FAILED (no 'videoping running' within ${TIMEOUT}s; log: $WORK/serial.log)"
