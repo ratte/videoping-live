@@ -1,6 +1,6 @@
 #!/bin/bash
-# Build the videoping .deb on Debian 13 with videoping's own packaging/deb/build-deb.sh and put it
-# into debs/ (the image takes every .deb from there).
+# Build the videoping .deb on Debian 13 with cargo-deb (the package layout is [package.metadata.deb]
+# in videoping's Cargo.toml) and put it into debs/ (the image takes every .deb from there).
 #
 # Skipped when debs/ already holds a videoping_*.deb, unless VP_REBUILD_DEB=1.
 # Source: the host folder VP_SRC (mounted at /videoping-src; default ../videoping), else a clone of
@@ -34,13 +34,18 @@ else
   unset GIT_DIR_SRC
 fi
 
-[ -x "$SRC/packaging/deb/build-deb.sh" ] || {
-  echo "deb: $SRC has no packaging/deb/build-deb.sh (videoping's .deb packaging); use a videoping"
+grep -q '^\[package.metadata.deb\]' "$SRC/Cargo.toml" || {
+  echo "deb: $SRC/Cargo.toml has no [package.metadata.deb] (videoping's .deb layout); use a videoping"
   echo "     version that has it (VP_SRC=<folder> or VP_REF=<branch>), or put a .deb into debs/"
   exit 1
 }
+if ! cargo deb --version >/dev/null 2>&1; then
+  echo "deb: installing cargo-deb"
+  cargo install cargo-deb --locked
+fi
 OUT="$(mktemp -d)"
-"$SRC/packaging/deb/build-deb.sh" "$OUT"
+# cargo deb builds the release binary itself (cargo build --release --locked), strips it and packs
+(cd "$SRC" && cargo deb --locked --output "$OUT")
 rm -f "$DEBS"/videoping_*.deb
 cp "$OUT"/videoping_*.deb "$DEBS/"
 rm -rf "$OUT"
