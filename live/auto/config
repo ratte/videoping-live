@@ -1,0 +1,27 @@
+#!/bin/sh
+# live-build configuration of the videoping live image (Debian 13 "trixie", amd64).
+# Run `lb config` in this folder; live-build calls this script.
+#
+# Environment:
+#   VP_KERNEL             kernel flavour: amd64 (default) or rt-amd64 (PREEMPT_RT)
+#   VP_BOOTAPPEND_EXTRA   extra kernel parameters, appended to the ones in ./bootappend
+set -e
+
+BOOTAPPEND="$(cat bootappend) ${VP_BOOTAPPEND_EXTRA:-}"
+
+lb config noauto \
+  --mode debian \
+  --distribution trixie \
+  --architectures amd64 \
+  --archive-areas "main contrib non-free non-free-firmware" \
+  --linux-flavours "${VP_KERNEL:-amd64}" \
+  --debian-installer none \
+  --binary-images iso-hybrid \
+  --firmware-binary true \
+  --firmware-chroot true \
+  --memtest none \
+  --iso-application "videoping live" \
+  --iso-volume "VIDEOPING_LIVE" \
+  --iso-publisher "videoping-live" \
+  --bootappend-live "$BOOTAPPEND" \
+  "${@}"

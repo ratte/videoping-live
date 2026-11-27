@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Right click on the desktop (or Ctrl+Alt+M): the menu of the videoping live image. -->
+<openbox_menu xmlns="http://openbox.org/3.4/menu">
+  <menu id="root-menu" label="videoping live">
+    <item label="Restart videoping   (Ctrl+Alt+R)"><action name="Execute"><command>pkill -x videoping</command></action></item>
+    <item label="Arrange screens   (Ctrl+Alt+S)"><action name="Execute"><command>videoping-screens</command></action></item>
+    <separator/>
+    <item label="Audio mixer   (Ctrl+Alt+A)"><action name="Execute"><command>pavucontrol</command></action></item>
+    <item label="Audio / MIDI patchbay   (Ctrl+Alt+P)"><action name="Execute"><command>qpwgraph</command></action></item>
+    <item label="Focusrite Scarlett mixer"><action name="Execute"><command>alsa-scarlett-gui</command></action></item>
+    <separator/>
+    <item label="Network"><action name="Execute"><command>xterm -title Network -e nmtui</command></action></item>
+    <item label="Terminal   (Ctrl+Alt+T)"><action name="Execute"><command>xterm</command></action></item>
+    <item label="System log"><action name="Execute"><command>xterm -title "System log" -e journalctl -b -f -t videoping-live -t videoping</command></action></item>
+    <separator/>
+    <item label="Reboot"><action name="Execute"><command>systemctl reboot</command></action></item>
+    <item label="Power off"><action name="Execute"><command>systemctl poweroff</command></action></item>
+  </menu>
+</openbox_menu>

@@ -1,0 +1,17 @@
+#!/bin/bash
+# Turn on every connected screen at its preferred mode, side by side from left to right
+# (the first one is the primary screen with the videoping ui), and turn off disconnected ones.
+# Run again after plugging in a projector: Ctrl+Alt+S, or the menu (right click on the desktop).
+prev=""
+for out in $(xrandr --query | awk '/ connected/ {print $1}'); do
+  if [ -z "$prev" ]; then
+    xrandr --output "$out" --auto --pos 0x0 --primary
+  else
+    xrandr --output "$out" --auto --right-of "$prev"
+  fi
+  prev="$out"
+done
+for out in $(xrandr --query | awk '/ disconnected [0-9]/ {print $1}'); do
+  xrandr --output "$out" --off
+done
+logger -t videoping-live -- "screens: $(xrandr --listmonitors | tail -n +2 | awk '{print $4" "$3}' | paste -sd ',' -)"

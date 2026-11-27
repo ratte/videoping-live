@@ -1,0 +1,1 @@
+boot=live components quiet username=vj hostname=videoping-live locales=en_US.UTF-8 keyboard-layouts=ch timezone=Europe/Zurich threadirqs preempt=full consoleblank=0 usbcore.autosuspend=-1

@@ -1,0 +1,15 @@
+#!/bin/sh
+# videoping live: system services and settings inside the image.
+set -e
+
+# NDI discovery (mDNS) and network
+systemctl enable avahi-daemon.service NetworkManager.service
+# don't hold up the boot waiting for a network
+systemctl mask NetworkManager-wait-online.service systemd-networkd-wait-online.service
+
+# nothing to update on a live system
+systemctl mask apt-daily.timer apt-daily-upgrade.timer man-db.timer 2>/dev/null || true
+
+# check that the videoping package made it into the image
+test -x /usr/bin/videoping
+test -d /usr/share/videoping

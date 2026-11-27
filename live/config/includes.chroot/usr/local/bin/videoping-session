@@ -1,0 +1,44 @@
+#!/bin/bash
+# X session of the videoping live image (started by startx from /etc/profile.d/videoping-live.sh):
+# window manager, screens, USB automount, system info in the journal, and videoping in a
+# restart loop. Logs go to the journal: journalctl -t videoping-live -t videoping
+log() { logger -t videoping-live -- "$*"; }
+
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$XDG_RUNTIME_DIR/bus}"
+systemctl --user import-environment DISPLAY XAUTHORITY 2>/dev/null || true
+
+# never blank the screen during a show
+xset s off -dpms s noblank
+xsetroot -solid black
+
+videoping-screens
+openbox --config-file /etc/videoping-live/openbox.xml &
+# mount USB sticks / disks with clips under /media/<user>/<label>
+udiskie --automount --no-notify --no-tray &
+
+log "session started on display $DISPLAY"
+videoping-live-info &
+
+cd "$HOME" || cd /
+fails=0
+while true; do
+  started=$(date +%s)
+  # stdout / stderr of videoping go into the journal (tag "videoping")
+  systemd-cat -t videoping /usr/bin/videoping &
+  pid=$!
+  log "videoping started (pid $pid)"
+  ( sleep 10; kill -0 "$pid" 2>/dev/null && log "videoping running (pid $pid)" ) &
+  wait "$pid"
+  rc=$?
+  log "videoping exited with code $rc"
+
+  if (( $(date +%s) - started < 30 )); then fails=$((fails + 1)); else fails=0; fi
+  if (( fails >= 5 )); then
+    log "videoping keeps crashing, opening a terminal (close it to try again)"
+    xterm -title "videoping keeps crashing - see: journalctl -t videoping" \
+      -e bash -c 'journalctl -b -t videoping -n 40 --no-pager; exec bash'
+    fails=0
+  fi
+  sleep 2
+done

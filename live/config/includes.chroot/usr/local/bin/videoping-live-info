@@ -1,0 +1,13 @@
+#!/bin/bash
+# Write what the live system found (GPU, audio, MIDI) into the journal: journalctl -t videoping-live
+log() { logger -t videoping-live -- "$*"; }
+sleep 3   # give PipeWire / WirePlumber a moment to find the devices
+
+log "kernel: $(uname -r) ($(grep -o 'preempt=[a-z]*' /proc/cmdline || echo default))"
+log "gpu: $(glxinfo -B 2>/dev/null | sed -n 's/^OpenGL renderer string: //p')"
+log "gl: $(glxinfo -B 2>/dev/null | sed -n 's/^OpenGL core profile version string: //p')"
+log "audio server: $(pactl info 2>/dev/null | sed -n 's/^Server Name: //p')"
+log "audio cards: $(aplay -l 2>/dev/null | sed -n 's/^card [0-9]*: \([^ ]*\) .*/\1/p' | sort -u | paste -sd ',' -)"
+log "audio sinks: $(pactl list short sinks 2>/dev/null | awk '{print $2}' | paste -sd ',' -)"
+log "audio sources: $(pactl list short sources 2>/dev/null | awk '{print $2}' | grep -v '\.monitor$' | paste -sd ',' -)"
+log "midi: $(aconnect -i 2>/dev/null | sed -n "s/^client [0-9]*: '\([^']*\)'.*/\1/p" | grep -v -e '^System$' -e '^Midi Through$' | paste -sd ',' -)"

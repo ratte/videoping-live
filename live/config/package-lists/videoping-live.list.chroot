@@ -1,0 +1,95 @@
+# Packages of the videoping live image. videoping itself comes as a local .deb
+# (config/packages.chroot/, filled by scripts/build-iso.sh).
+
+# --- live system ------------------------------------------------------------
+live-boot
+live-config
+live-config-systemd
+systemd-sysv
+libpam-systemd
+dbus-user-session
+sudo
+locales
+keyboard-configuration
+console-setup
+tzdata
+user-setup
+
+# --- firmware and microcode -------------------------------------------------
+firmware-linux-free
+firmware-linux-nonfree
+firmware-misc-nonfree
+firmware-amd-graphics
+firmware-intel-graphics
+firmware-sof-signed
+firmware-realtek
+firmware-iwlwifi
+intel-microcode
+amd64-microcode
+
+# --- graphics: X11, Mesa, hardware video decoding ---------------------------
+xserver-xorg-core
+xserver-xorg-input-all
+xserver-xorg-video-all
+xinit
+x11-xserver-utils
+x11-utils
+openbox
+xterm
+mesa-utils
+libgl1-mesa-dri
+libegl1
+mesa-va-drivers
+intel-media-va-driver-non-free
+i965-va-driver
+vainfo
+fonts-dejavu-core
+
+# --- video: GStreamer -------------------------------------------------------
+gstreamer1.0-tools
+gstreamer1.0-plugins-base
+gstreamer1.0-plugins-good
+gstreamer1.0-plugins-bad
+gstreamer1.0-plugins-ugly
+gstreamer1.0-libav
+gstreamer1.0-vaapi
+gstreamer1.0-alsa
+gstreamer1.0-pipewire
+
+# --- audio: PipeWire (Pulse, ALSA and JACK clients), USB audio interfaces ---
+pipewire
+pipewire-audio
+pipewire-pulse
+pipewire-alsa
+pipewire-jack
+wireplumber
+rtkit
+alsa-utils
+alsa-ucm-conf
+alsa-topology-conf
+alsa-firmware-loaders
+pulseaudio-utils
+pavucontrol
+qpwgraph
+alsa-scarlett-gui
+
+# --- network: internet (videopong.net, AI), NDI discovery -------------------
+network-manager
+avahi-daemon
+libnss-mdns
+ca-certificates
+curl
+
+# --- USB sticks and disks with clips ----------------------------------------
+udisks2
+udiskie
+exfatprogs
+dosfstools
+ntfs-3g
+
+# --- tools ------------------------------------------------------------------
+htop
+less
+nano
+pciutils
+usbutils
