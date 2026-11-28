@@ -34,9 +34,30 @@ driver. The NDI runtime can be installed on the running live system, see below.
 
 ## using the live system
 
-Write the ISO to a USB stick, for example `sudo dd if=videoping-live-….iso of=/dev/sdX bs=4M
-conv=fsync status=progress` (all data on the stick is lost) or with any USB image writer.
-Then boot from the stick.
+Download `videoping-live-<version>-amd64.iso` from the
+[releases](https://github.com/ratte/videoping-live/releases) and write it to a USB stick of at
+least 2 GB. **All data on the stick is lost.**
+
+**With balenaEtcher** (Windows, macOS, Linux; the easiest way):
+
+1. Install [balenaEtcher](https://etcher.balena.io/) and start it
+2. *Flash from file*: choose the downloaded `.iso`
+3. *Select target*: choose the USB stick. Check that it is really the stick and not a disk
+4. *Flash!* Etcher writes the image and then checks it (*Validating*). Wait until it says
+   *Flash Complete!*
+
+If Etcher warns that the image is not a bootable "hybrid" image or has no partition table, go on:
+the ISO is a hybrid image and boots from a USB stick as it is. Afterwards Windows may say the
+stick needs formatting: don't format it, that is normal for a Linux stick.
+
+**On Linux without Etcher**: `sudo dd if=videoping-live-….iso of=/dev/sdX bs=4M conv=fsync
+status=progress` (`/dev/sdX` is the whole stick, not a partition; check with `lsblk`), or any
+other USB image writer.
+
+Then boot from the stick: plug it in, switch the machine on and pick the USB stick in the boot
+menu (often F12, F11, F8 or Esc while starting; on a Mac hold Option). The live system needs an
+x86-64 (amd64) machine; Macs with Apple silicon can't boot it. If the stick doesn't show up,
+turn off *Secure Boot* in the firmware settings.
 
 | keys | |
 |---|---|
