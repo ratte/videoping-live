@@ -1,0 +1,123 @@
+# Build the videoping live ISO on GitHub and publish it as a release.
+#
+# - push a tag v* (e.g. git tag v2026.11.28 && git push origin v2026.11.28): build, smoke test,
+#   and a GitHub release for that tag with the ISO, its sha256 and the package list
+# - Actions → build-iso → Run workflow: the same by hand. With "release tag" empty it only
+#   builds and tests (the ISO is kept as a workflow artifact for 7 days)
+#
+# The build runs in a privileged debian:trixie container (live-build needs chroot and mounts),
+# with scripts/ci-build.sh: videoping .deb from source, ISO, smoke test in QEMU with KVM.
+name: build-iso
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      videoping_ref:
+        description: "videoping branch or tag (github.com/toastbrotch/videoping)"
+        default: main
+      kernel:
+        description: "kernel flavour"
+        type: choice
+        options: [amd64, rt-amd64]
+        default: amd64
+      release_tag:
+        description: "publish as a release with this tag (e.g. v2026.11.28); empty: build only"
+        default: ""
+      prerelease:
+        description: "mark the release as a pre-release"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-iso-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    env:
+      VP_REF: ${{ inputs.videoping_ref || 'main' }}
+      VP_KERNEL: ${{ inputs.kernel || 'amd64' }}
+      RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/share/swift
+          sudo docker image prune --all --force > /dev/null
+          df -h /
+
+      - name: Enable KVM (for the smoke test)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+
+      - name: Build .deb, ISO and smoke test
+        run: |
+          tag="${RELEASE_TAG#v}"
+          name="videoping-live-${tag:-$(date -u +%Y%m%d)}-amd64"
+          kvm=(); [ -e /dev/kvm ] && kvm=(--device /dev/kvm)
+          docker run --rm --privileged "${kvm[@]}" \
+            -v "$PWD:/src" -w /src \
+            -e VP_REF -e VP_KERNEL -e VP_ISO_NAME="$name" \
+            debian:trixie scripts/ci-build.sh
+          sudo chown -R "$(id -u):$(id -g)" out debs
+
+      - name: Smoke test log and screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test
+          path: |
+            out/smoke-test/
+            out/build-info.txt
+          if-no-files-found: ignore
+
+      - name: Keep the ISO (no release)
+        if: env.RELEASE_TAG == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: iso
+          path: |
+            out/*.iso
+            !out/videoping-live-latest.iso
+            out/*.iso.sha256
+            out/*.packages
+          retention-days: 7
+          compression-level: 0
+
+      - name: Publish the release
+        if: env.RELEASE_TAG != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          iso=$(ls out/videoping-live-*-amd64.iso | grep -v latest)
+          size=$(stat -c %s "$iso")
+          [ "$size" -lt 2147483648 ] || { echo "ISO is larger than GitHub's 2 GiB asset limit"; exit 1; }
+          {
+            echo "Bootable live image (Debian 13) that starts videoping. Write it to a USB stick, e.g."
+            echo '`sudo dd if='"$(basename "$iso")"' of=/dev/sdX bs=4M conv=fsync status=progress`,'
+            echo "and boot from it. See the README for keys and settings."
+            echo
+            echo '```'
+            cat out/build-info.txt
+            echo '```'
+          } > notes.md
+          flags=(); [ "${{ inputs.prerelease }}" = true ] && flags+=(--prerelease)
+          if ! gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" \
+              --title "videoping live $RELEASE_TAG" --notes-file notes.md "${flags[@]}"
+          fi
+          gh release upload "$RELEASE_TAG" --clobber "$iso" "$iso.sha256" "${iso%.iso}.packages"

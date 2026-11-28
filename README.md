@@ -146,6 +146,30 @@ sudo scripts/build-iso.sh
 scripts/smoke-test.sh            # needs qemu-system-x86, xorriso, socat, netpbm
 ```
 
+Or everything in one go, in a container (what GitHub Actions runs):
+
+```sh
+docker run --rm --privileged --device /dev/kvm -v "$PWD:/src" -w /src \
+  -e VP_REF=main debian:trixie scripts/ci-build.sh
+```
+
+## build on GitHub (releases)
+
+`.github/workflows/build-iso.yml` builds the image on GitHub Actions with `scripts/ci-build.sh` in
+a privileged `debian:trixie` container: the videoping `.deb` from source (`toastbrotch/videoping`,
+branch `main` by default), the ISO, and the smoke test in QEMU with KVM. It takes about 40 minutes.
+
+- **release**: push a tag, e.g. `git tag v2026.11.28 && git push origin v2026.11.28`. The release
+  for that tag gets `videoping-live-2026.11.28-amd64.iso`, its `.sha256` and the package list,
+  and the release notes say which videoping commit is inside
+- **by hand**: Actions → *build-iso* → *Run workflow*, with the videoping branch or tag, the
+  kernel (`amd64` / `rt-amd64`) and optionally a release tag. Without a release tag the ISO is
+  kept as a workflow artifact for 7 days
+- every run keeps the smoke test's serial log and screenshot as the artifact `smoke-test`
+
+The NDI runtime is never part of the release (see `videoping-install-ndi`). GitHub allows 2 GiB
+per release file; the ISO is about 1.4 GB.
+
 ## tested
 
 On 2026-11-27, on a Linux host with VirtualBox 7.2.22, Vagrant 2.4.9, box `bento/debian-13`
@@ -177,6 +201,8 @@ v202510.26.0, videoping 0.1.0 (723b0d9 plus local changes):
 | `…/usr/local/bin/videoping-live-info` | logs GPU, audio and MIDI devices to the journal |
 | `…/etc/videoping-live/openbox*.xml` | window manager keys, menu, videoping window without a frame |
 | `…/etc/security/limits.d/`, `…/etc/pipewire/pipewire.conf.d/` | realtime audio limits, PipeWire sample rates |
+| `…/usr/local/bin/videoping-install-ndi` | installs the NDI runtime on the running system (menu: Install NDI runtime) |
+| `scripts/ci-build.sh`, `.github/workflows/build-iso.yml` | the whole build in one go, and the GitHub build and release |
 
 Why X11 and not Wayland: X11 with a small window manager behaves the same on every GPU and in
 VMs, and it makes placing the output window on a second screen or projector simple.
