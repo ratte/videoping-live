@@ -159,9 +159,17 @@ docker run --rm --privileged --device /dev/kvm -v "$PWD:/src" -w /src \
 a privileged `debian:trixie` container: the videoping `.deb` from source (`toastbrotch/videoping`,
 branch `main` by default), the ISO, and the smoke test in QEMU with KVM. It takes about 40 minutes.
 
-- **release**: push a tag, e.g. `git tag v2026.11.28 && git push origin v2026.11.28`. The release
-  for that tag gets `videoping-live-2026.11.28-amd64.iso`, its `.sha256` and the package list,
-  and the release notes say which videoping commit is inside
+- **automatic**: `.github/workflows/follow-videoping.yml` checks videoping's releases every hour.
+  When videoping publishes a new release `v*` (e.g. `v0.0.3`), it builds the image with that
+  videoping version and publishes it here as release `v0.0.3`, so the release numbers are the
+  same. It never builds a version older than one already released here; drafts are picked up
+  once published. *Run workflow* on it checks right away, or builds a given videoping tag.
+  GitHub turns scheduled workflows off after 60 days without activity in the repository; turn
+  it on again under Actions → *follow-videoping*
+- **release by hand**: push a tag, e.g. `git tag v0.0.3 && git push origin v0.0.3`. videoping is
+  built from its tag of the same name if it has one, else from `main`. The release gets
+  `videoping-live-0.0.3-amd64.iso`, its `.sha256` and the package list, and the release notes
+  say which videoping commit is inside
 - **by hand**: Actions → *build-iso* → *Run workflow*, with the videoping branch or tag, the
   kernel (`amd64` / `rt-amd64`) and optionally a release tag. Without a release tag the ISO is
   kept as a workflow artifact for 7 days
@@ -203,6 +211,7 @@ v202510.26.0, videoping 0.1.0 (723b0d9 plus local changes):
 | `…/etc/security/limits.d/`, `…/etc/pipewire/pipewire.conf.d/` | realtime audio limits, PipeWire sample rates |
 | `…/usr/local/bin/videoping-install-ndi` | installs the NDI runtime on the running system (menu: Install NDI runtime) |
 | `scripts/ci-build.sh`, `.github/workflows/build-iso.yml` | the whole build in one go, and the GitHub build and release |
+| `.github/workflows/follow-videoping.yml` | a new live release for every new videoping release, with the same number |
 
 Why X11 and not Wayland: X11 with a small window manager behaves the same on every GPU and in
 VMs, and it makes placing the output window on a second screen or projector simple.

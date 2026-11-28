@@ -1,0 +1,88 @@
+# Follow videoping's releases: when github.com/toastbrotch/videoping publishes a new release with a
+# tag v* (e.g. v0.0.3), build the live ISO with that videoping version and publish it here as a
+# release with the same tag.
+#
+# videoping is another repository, so its releases cannot trigger this one: this checks every
+# hour. It builds the newest published videoping release that has no release here yet, and never
+# one that is older than a videoping version already released here. Draft releases of videoping
+# are not visible and are picked up once they are published.
+#
+# Actions → follow-videoping → Run workflow checks right away; with a tag it builds that
+# videoping release (also an older one, or again after deleting the live release).
+#
+# Note: GitHub turns off scheduled workflows in public repositories after 60 days without
+# activity in the repository. Re-enable it under Actions → follow-videoping.
+name: follow-videoping
+
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "build this videoping release tag (empty: the newest one not released here)"
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: follow-videoping
+  cancel-in-progress: false
+
+env:
+  VIDEOPING_REPO: toastbrotch/videoping
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.check.outputs.tag }}
+      prerelease: ${{ steps.check.outputs.prerelease }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WANT: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          # published (not draft) videoping releases with a v* tag, newest version first
+          gh api "repos/$VIDEOPING_REPO/releases?per_page=100" \
+            -q '.[] | select(.draft | not) | select(.tag_name | startswith("v")) | "\(.tag_name) \(.prerelease)"' \
+            | sort -V -r > vp-releases.txt
+          echo "videoping releases:"; cat vp-releases.txt
+          # all videoping tags (also of releases that are still drafts) and the releases here
+          git ls-remote --tags --refs "https://github.com/$VIDEOPING_REPO.git" 'v*' \
+            | sed 's|.*refs/tags/||' > vp-tags.txt
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" -q '.[].tag_name' > live-releases.txt
+
+          if [ -n "$WANT" ]; then
+            line=$(awk -v t="$WANT" '$1 == t' vp-releases.txt)
+            [ -n "$line" ] || { echo "::error::$WANT is not a published videoping release"; exit 1; }
+          else
+            line=$(head -n 1 vp-releases.txt)
+            [ -n "$line" ] || { echo "no videoping release"; exit 0; }
+            tag=${line%% *}
+            if grep -qxF "$tag" live-releases.txt; then
+              echo "$tag is already released here, nothing to do"; exit 0
+            fi
+            # newest videoping version released here (tags that videoping also has)
+            newest_here=$(grep -xF -f vp-tags.txt live-releases.txt | sort -V | tail -n 1 || true)
+            if [ -n "$newest_here" ] && [ "$(printf '%s\n%s\n' "$tag" "$newest_here" | sort -V | tail -n 1)" != "$tag" ]; then
+              echo "newest videoping release $tag is older than $newest_here released here, nothing to do"; exit 0
+            fi
+          fi
+          tag=${line%% *}; pre=${line##* }
+          echo "build videoping $tag (prerelease: $pre)"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$pre" >> "$GITHUB_OUTPUT"
+          echo "videoping **$tag** → building the live ISO and release **$tag**" >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    needs: check
+    if: needs.check.outputs.tag != ''
+    uses: ./.github/workflows/build-iso.yml
+    with:
+      videoping_ref: ${{ needs.check.outputs.tag }}
+      release_tag: ${{ needs.check.outputs.tag }}
+      prerelease: ${{ needs.check.outputs.prerelease == 'true' }}

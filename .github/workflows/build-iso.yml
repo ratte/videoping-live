@@ -1,7 +1,9 @@
 # Build the videoping live ISO on GitHub and publish it as a release.
 #
-# - push a tag v* (e.g. git tag v2026.11.28 && git push origin v2026.11.28): build, smoke test,
-#   and a GitHub release for that tag with the ISO, its sha256 and the package list
+# - push a tag v* (e.g. git tag v0.0.3 && git push origin v0.0.3): build, smoke test, and a
+#   GitHub release for that tag with the ISO, its sha256 and the package list. videoping is built
+#   from the tag of the same name if videoping has one, else from main
+# - follow-videoping.yml calls this workflow when videoping publishes a new release
 # - Actions → build-iso → Run workflow: the same by hand. With "release tag" empty it only
 #   builds and tests (the ISO is kept as a workflow artifact for 7 days)
 #
@@ -23,10 +25,24 @@ on:
         options: [amd64, rt-amd64]
         default: amd64
       release_tag:
-        description: "publish as a release with this tag (e.g. v2026.11.28); empty: build only"
+        description: "publish as a release with this tag (e.g. v0.0.3); empty: build only"
         default: ""
       prerelease:
         description: "mark the release as a pre-release"
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      videoping_ref:
+        type: string
+        default: main
+      kernel:
+        type: string
+        default: amd64
+      release_tag:
+        type: string
+        default: ""
+      prerelease:
         type: boolean
         default: false
 
@@ -42,7 +58,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 240
     env:
-      VP_REF: ${{ inputs.videoping_ref || 'main' }}
+      VP_REF: ${{ inputs.videoping_ref }}
       VP_KERNEL: ${{ inputs.kernel || 'amd64' }}
       RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.release_tag }}
     steps:
@@ -66,6 +82,16 @@ jobs:
 
       - name: Build .deb, ISO and smoke test
         run: |
+          if [ -z "$VP_REF" ]; then
+            # tag push: videoping's tag of the same name if there is one, else main
+            if git ls-remote --exit-code --tags https://github.com/toastbrotch/videoping.git "refs/tags/$RELEASE_TAG" > /dev/null; then
+              VP_REF="$RELEASE_TAG"
+            else
+              VP_REF=main
+            fi
+          fi
+          export VP_REF
+          echo "videoping: $VP_REF"
           tag="${RELEASE_TAG#v}"
           name="videoping-live-${tag:-$(date -u +%Y%m%d)}-amd64"
           kvm=(); [ -e /dev/kvm ] && kvm=(--device /dev/kvm)
@@ -103,7 +129,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          iso=$(ls out/videoping-live-*-amd64.iso | grep -v latest)
+          iso=$(find out -maxdepth 1 -type f -name 'videoping-live-*-amd64.iso')
           size=$(stat -c %s "$iso")
           [ "$size" -lt 2147483648 ] || { echo "ISO is larger than GitHub's 2 GiB asset limit"; exit 1; }
           {
